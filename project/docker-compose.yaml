@@ -1,0 +1,119 @@
+version: '3.7'
+
+services:
+  nginx_proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx_proxy
+    networks:
+      red:
+        ipv4_address: 10.5.0.1
+    restart: always
+    environment:
+      DEFAULT_HOST: ${DOMAIN}
+    ports:
+      - "80:80"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./config/nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
+
+  correo:
+    image: maildev/maildev:2.0.0-beta3
+    container_name: correo
+    networks:
+      red:
+        ipv4_address: 10.3.0.4
+    ports:
+      - "1025:1025"
+    environment:
+      VIRTUAL_HOST: correo.${DOMAIN}
+      VIRTUAL_PORT: 1080
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    networks:
+      red:
+        ipv4_address: 10.5.0.5
+    links:
+      - wordpress_mysql
+    environment:
+      VIRTUAL_HOST: pma.${DOMAIN}
+      LETSENCRYPT_HOST: pma.${DOMAIN}
+      LETSENCRYPT_EMAIL: ${EMAIL}
+      PMA_ARBITRARY: 1
+    volumes:
+      - ./config/php.ini:/usr/local/etc/php/php.ini
+
+  # WordPress
+
+  wordpress_varnish:
+    image: varnish
+    container_name: wordpress_varnish
+    depends_on:
+      - wordpress_web
+    environment:
+      VIRTUAL_HOST: ${DOMAIN}
+    restart: always
+    volumes:
+      - ./wordpress/config/default.vcl:/etc/varnish/default.vcl
+    networks:
+      red:
+        ipv4_address: 10.5.0.13
+
+  wordpress_web:
+    image: crunchgeek/nginx-pagespeed:1.17.3-r1
+    container_name: wordpress_web
+    hostname: wordpress_web
+    working_dir: /var/www/html
+    restart: always
+    volumes:
+      - ./wordpress/app:/var/www/html:ro
+      - ./wordpress/config:/config
+    depends_on:
+      - wordpress_php
+      - wordpress_mysql
+    networks:
+      red:
+        ipv4_address: 10.5.0.12
+    env_file: ./wordpress/nginx.env
+
+  wordpress_php:
+    image: crunchgeek/php-fpm:7.3-r7
+    container_name: wordpress_php
+    restart: always
+    working_dir: /var/www/html
+    hostname: wordpress_php
+    networks:
+      red:
+        ipv4_address: 10.5.0.11
+    volumes:
+      - ./wordpress/app:/var/www/html
+      - ./wordpress/config:/config:ro
+      - ./wordpress/boot_scripts:/boot_scripts:ro
+      - ./.env:/config.env:ro
+    env_file: ./wordpress/php-fpm.env
+
+  wordpress_mysql:
+    image: mysql:8.0.20
+    container_name: wordpress_mysql
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME}
+      MYSQL_ROOT_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+    volumes:
+      - ./wordpress/mysql:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      red:
+        ipv4_address: 10.5.0.10
+    cap_add:
+      - SYS_NICE
+
+networks:
+  red:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/8

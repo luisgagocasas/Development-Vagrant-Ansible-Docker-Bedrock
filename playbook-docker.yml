@@ -1,0 +1,55 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+    - name: install packages required
+      apt:
+        name: "{{ item }}"
+        state: latest
+        update_cache: true
+      loop:
+        - docker.io
+        - python
+        - docker-compose
+        - boxes
+
+    - name: Create "docker" group
+      group:
+        name: docker
+        state: present
+
+    - name: Add user vagrant to "docker" group
+      user:
+        name: vagrant
+        group: docker
+        state: present
+
+    - name: Add alias for Docker
+      blockinfile:
+        path: /home/vagrant/.bashrc
+        block: |
+          alias dc:up=\"docker-compose up -d\"
+          alias dc:down=\"docker-compose down\"
+          alias dc:logs=\"docker-compose logs -f\"
+          alias dc:config=\"docker-compose config\"
+          alias dc:pull=\"docker-compose pull\"
+        marker: "# AyPhu - Alias Docker-compose"
+    
+    - name: Change Welcome Message
+      shell: |
+        version=$(cat /etc/os-release |grep VERSION= | cut -d'=' -f2 | sed 's/"//g')
+        ipserver=$(hostname -I | cut -d' ' -f2)
+        sudo echo -e "\necho \"Welcome to management server with AyPhu \n IP Server: ${ipserver} \n Ubuntu Server ${version} \n Server: Master\" | boxes -d dog -a c\n" >> /home/vagrant/.bashrc
+
+    - name: Copy website files to the server's document root
+      copy:
+        src: project/
+        dest: project/
+        owner: vagrant
+        group: vagrant
+        mode: preserve
+
+    - name: Deploy Docker Compose
+      docker_compose:
+        project_src: project/
+        state: present
