@@ -1,4 +1,4 @@
-# Development Vagrant + Ansible + Docker + Bedrock
+# Development Vagrant + Ansible + Docker + WordPress + Bedrock
 
 Use this repository in development environment.
 
@@ -65,13 +65,17 @@ cp project/.env_example project/.env
 | 2  | http://pma.ayphu.local/  | Manager Mysql  |
 | 3  | http://correo.ayphu.local/  |  Mail Manager |
 
+## Diagrams
+
+![Estructure](image/drawio.png)
+
 ## Variable important (Vagrantfile)
 
 - VM_IP (IP base)
 
 ## Folder
 
-- /project/ - docker-compose with node
+- /project/ - docker-compose with php, mysql
 
 ## Document
 
